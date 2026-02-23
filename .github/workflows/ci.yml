@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang-format python3 python3-pip iputils-ping
+
+      - name: Build C
+        working-directory: agent_c
+        run: make build
+
+      - name: Run C tests
+        working-directory: agent_c
+        run: make test_c
+
+      - name: clang-format check (C)
+        working-directory: agent_c
+        run: make lint
+
+      - name: forbid system() (C)
+        working-directory: agent_c
+        run: make forbid_system
+
+      - name: Install Python deps
+        working-directory: agent_py
+        run: python3 -m pip install -r requirements.txt
+
+      - name: Python tests
+        working-directory: agent_py
+        run: pytest -q
+
+      - name: Python formatting/lint
+        working-directory: agent_py
+        run: |
+          ruff check .
+          black --check .
+
+      - name: Bandit security scan
+        working-directory: agent_py
+        run: bandit -r . -c bandit.yaml
